@@ -556,86 +556,86 @@ LocatorList_t UDPTransportInterface::ShrinkLocatorLists(const std::vector<Locato
 
         while (it != locatorList.end())
         {
-            assert((*it).kind == mTransportKind);
-
-            if (IPLocator::isMulticast(*it))
+            if (it->kind == mTransportKind)
             {
-                // If the multicast locator is already chosen, not choose any unicast locator.
-                if (multicastResult.contains(*it))
+                if (IPLocator::isMulticast(*it))
                 {
-                    multicastDefined = true;
-                    pendingUnicast.clear();
+                    // If the multicast locator is already chosen, not choose any unicast locator.
+                    if (multicastResult.contains(*it))
+                    {
+                        multicastDefined = true;
+                        pendingUnicast.clear();
+                    }
+                    else
+                    {
+                        // Search the multicast locator in pending locators.
+                        auto pending_it = pendingLocators.begin();
+                        bool found = false;
+
+                        while (pending_it != pendingLocators.end())
+                        {
+                            if ((*pending_it).multicast.contains(*it))
+                            {
+                                // Multicast locator was found, add it to final locators.
+                                multicastResult.push_back((*pending_it).multicast);
+                                pendingLocators.erase(pending_it);
+
+                                // Not choose any unicast
+                                multicastDefined = true;
+                                pendingUnicast.clear();
+                                found = true;
+
+                                break;
+                            }
+
+                            ++pending_it;
+                        };
+
+                        // If not found, store as pending multicast.
+                        if (!found)
+                            pendingMulticast.push_back(*it);
+                    }
                 }
                 else
                 {
-                    // Search the multicast locator in pending locators.
-                    auto pending_it = pendingLocators.begin();
-                    bool found = false;
-
-                    while (pending_it != pendingLocators.end())
+                    if (!multicastDefined)
                     {
-                        if ((*pending_it).multicast.contains(*it))
+                        // Check is local interface.
+                        auto localInterface = currentInterfaces.begin();
+                        for (; localInterface != currentInterfaces.end(); ++localInterface)
                         {
-                            // Multicast locator was found, add it to final locators.
-                            multicastResult.push_back((*pending_it).multicast);
-                            pendingLocators.erase(pending_it);
-
-                            // Not choose any unicast
-                            multicastDefined = true;
-                            pendingUnicast.clear();
-                            found = true;
-
-                            break;
-                        }
-
-                        ++pending_it;
-                    };
-
-                    // If not found, store as pending multicast.
-                    if (!found)
-                        pendingMulticast.push_back(*it);
-                }
-            }
-            else
-            {
-                if (!multicastDefined)
-                {
-                    // Check is local interface.
-                    auto localInterface = currentInterfaces.begin();
-                    for (; localInterface != currentInterfaces.end(); ++localInterface)
-                    {
-                        if (CompareLocatorIP(localInterface->locator, *it))
-                        {
-                            // Check 127.0.0.1 in the whitelist
-                            Locator_t loopbackLocator;
-                            FillLocalIp(loopbackLocator);
-                            if (IsLocatorAllowed(loopbackLocator))
+                            if (CompareLocatorIP(localInterface->locator, *it))
                             {
-                                // Loopback locator
-                                IPLocator::setPhysicalPort(loopbackLocator, IPLocator::getPhysicalPort(*it));
-                                pendingUnicast.push_back(loopbackLocator);
-                                break;
-                            }
-                            else
-                            {
-                                // Check interface in whitelist
-                                if (IsLocatorAllowed(*it))
+                                // Check 127.0.0.1 in the whitelist
+                                Locator_t loopbackLocator;
+                                FillLocalIp(loopbackLocator);
+                                if (IsLocatorAllowed(loopbackLocator))
                                 {
-                                    // Custom Loopback locator
-                                    pendingUnicast.push_back(*it);
+                                    // Loopback locator
+                                    IPLocator::setPhysicalPort(loopbackLocator, IPLocator::getPhysicalPort(*it));
+                                    pendingUnicast.push_back(loopbackLocator);
                                     break;
+                                }
+                                else
+                                {
+                                    // Check interface in whitelist
+                                    if (IsLocatorAllowed(*it))
+                                    {
+                                        // Custom Loopback locator
+                                        pendingUnicast.push_back(*it);
+                                        break;
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    if (localInterface == currentInterfaces.end())
-                    {
-                        pendingUnicast.push_back(*it);
+                        if (localInterface == currentInterfaces.end())
+                        {
+                            pendingUnicast.push_back(*it);
+                        }
                     }
                 }
             }
-
             ++it;
         }
 

@@ -334,84 +334,86 @@ LocatorList_t TCPv4Transport::ShrinkLocatorLists(const std::vector<LocatorList_t
         bool addLocator = true;
         while (it != locatorList.end())
         {
-            assert((*it).kind == mTransportKind);
-            addLocator = true;
-
-            // Check is local interface.
-            auto localInterface = mCurrentInterfaces.begin();
-            for (; localInterface != mCurrentInterfaces.end(); ++localInterface)
+            if (it->kind == mTransportKind)
             {
-                if (CompareLocatorIP(localInterface->locator, *it))
+                addLocator = true;
+
+                // Check is local interface.
+                auto localInterface = mCurrentInterfaces.begin();
+                for (; localInterface != mCurrentInterfaces.end(); ++localInterface)
                 {
-                    // Loopback locator
-                    Locator_t loopbackLocator;
-                    FillLocalIp(loopbackLocator);
-                    IPLocator::setPhysicalPort(loopbackLocator, IPLocator::getPhysicalPort(*it));
-                    IPLocator::setLogicalPort(loopbackLocator, IPLocator::getLogicalPort(*it));
-                    pendingUnicast.push_back(loopbackLocator);
-                    addLocator = false;
-                    break;
-                }
-            }
-
-            // Add localhost?
-            if (localInterface == mCurrentInterfaces.end() && IPLocator::isLocal(*it))
-            {
-                pendingUnicast.push_back(*it);
-                ++it;
-                continue;
-            }
-            else if (!addLocator)
-            {
-                ++it;
-                continue;
-            }
-
-            // Check Remote WAN locators.
-            if (memcmp(IPLocator::getWan(*it), mConfiguration_.wan_addr, 4) != 0)
-            {
-                // Only allow one locator with the same WAN and physical port.
-                for (auto unicastLocator = unicastResult.begin(); unicastLocator != unicastResult.end(); ++unicastLocator)
-                {
-                    if (memcmp(IPLocator::getWan(*unicastLocator), IPLocator::getWan(*it), 4) == 0 && unicastLocator->port == it->port)
+                    if (CompareLocatorIP(localInterface->locator, *it))
                     {
+                        // Loopback locator
+                        Locator_t loopbackLocator;
+                        FillLocalIp(loopbackLocator);
+                        IPLocator::setPhysicalPort(loopbackLocator, IPLocator::getPhysicalPort(*it));
+                        IPLocator::setLogicalPort(loopbackLocator, IPLocator::getLogicalPort(*it));
+                        pendingUnicast.push_back(loopbackLocator);
                         addLocator = false;
                         break;
                     }
                 }
-            }
-            else
-            {
-                // With the same wan than the server, only allow one locator with the same address and physical port.
-                for (auto unicastLocator = unicastResult.begin(); unicastLocator != unicastResult.end(); ++unicastLocator)
+
+                // Add localhost?
+                if (localInterface == mCurrentInterfaces.end() && IPLocator::isLocal(*it))
                 {
-                    if (memcmp(IPLocator::getIPv4(*unicastLocator), IPLocator::getIPv4(*it), 4) == 0 && unicastLocator->port == it->port)
+                    pendingUnicast.push_back(*it);
+                    ++it;
+                    continue;
+                }
+                else if (!addLocator)
+                {
+                    ++it;
+                    continue;
+                }
+
+                // Check Remote WAN locators.
+                if (memcmp(IPLocator::getWan(*it), mConfiguration_.wan_addr, 4) != 0)
+                {
+                    // Only allow one locator with the same WAN and physical port.
+                    for (auto unicastLocator = unicastResult.begin(); unicastLocator != unicastResult.end(); ++unicastLocator)
                     {
-                        addLocator = false;
-                        break;
+                        if (memcmp(IPLocator::getWan(*unicastLocator), IPLocator::getWan(*it), 4) == 0 && unicastLocator->port == it->port)
+                        {
+                            addLocator = false;
+                            break;
+                        }
                     }
                 }
-            }
-
-            if (addLocator)
-            {
-                addLocator = false;
-
-                // Only allow already connected locators.
-                for (auto locatorIt = connectedLocators.begin(); locatorIt != connectedLocators.end(); ++locatorIt)
+                else
                 {
-                    if (((IPLocator::hasWan(*it) && memcmp(IPLocator::getWan(*it), IPLocator::getIPv4(*locatorIt), 4) == 0) ||
-                        (!IPLocator::hasWan(*it) && memcmp(IPLocator::getIPv4(*it), IPLocator::getIPv4(*locatorIt), 4) == 0)) &&
-                        IPLocator::getPhysicalPort(*locatorIt) == IPLocator::getPhysicalPort(*it))
+                    // With the same wan than the server, only allow one locator with the same address and physical port.
+                    for (auto unicastLocator = unicastResult.begin(); unicastLocator != unicastResult.end(); ++unicastLocator)
                     {
-                        addLocator = true;
-                        break;
+                        if (memcmp(IPLocator::getIPv4(*unicastLocator), IPLocator::getIPv4(*it), 4) == 0 && unicastLocator->port == it->port)
+                        {
+                            addLocator = false;
+                            break;
+                        }
                     }
                 }
 
                 if (addLocator)
                 {
-                    pendingUnicast.push_back(*it);
+                    addLocator = false;
+
+                    // Only allow already connected locators.
+                    for (auto locatorIt = connectedLocators.begin(); locatorIt != connectedLocators.end(); ++locatorIt)
+                    {
+                        if (((IPLocator::hasWan(*it) && memcmp(IPLocator::getWan(*it), IPLocator::getIPv4(*locatorIt), 4) == 0) ||
+                            (!IPLocator::hasWan(*it) && memcmp(IPLocator::getIPv4(*it), IPLocator::getIPv4(*locatorIt), 4) == 0)) &&
+                            IPLocator::getPhysicalPort(*locatorIt) == IPLocator::getPhysicalPort(*it))
+                        {
+                            addLocator = true;
+                            break;
+                        }
+                    }
+
+                    if (addLocator)
+                    {
+                        pendingUnicast.push_back(*it);
+                    }
                 }
             }
             ++it;

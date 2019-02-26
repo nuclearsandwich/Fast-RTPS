@@ -1079,27 +1079,29 @@ LocatorList_t TCPTransportInterface::ShrinkLocatorLists(const std::vector<Locato
 
         while (it != locatorList.end())
         {
-            assert((*it).kind == mTransportKind);
-
-            // Check is local interface.
-            auto localInterface = mCurrentInterfaces.begin();
-            for (; localInterface != mCurrentInterfaces.end(); ++localInterface)
+            if (it->kind == mTransportKind)
             {
-                if (CompareLocatorIP(localInterface->locator, *it))
+                // Check is local interface.
+                auto localInterface = mCurrentInterfaces.begin();
+                for (; localInterface != mCurrentInterfaces.end(); ++localInterface)
                 {
-                    // Loopback locator
-                    Locator_t loopbackLocator;
-                    FillLocalIp(loopbackLocator);
-                    IPLocator::setPhysicalPort(loopbackLocator, IPLocator::getPhysicalPort(*it));
-                    IPLocator::setLogicalPort(loopbackLocator, IPLocator::getLogicalPort(*it));
-                    pendingUnicast.push_back(loopbackLocator);
-                    break;
+                    if (CompareLocatorIP(localInterface->locator, *it))
+                    {
+                        // Loopback locator
+                        Locator_t loopbackLocator;
+                        FillLocalIp(loopbackLocator);
+                        IPLocator::setPhysicalPort(loopbackLocator, IPLocator::getPhysicalPort(*it));
+                        IPLocator::setLogicalPort(loopbackLocator, IPLocator::getLogicalPort(*it));
+                        pendingUnicast.push_back(loopbackLocator);
+                        break;
+                    }
+                }
+
+                if (localInterface == mCurrentInterfaces.end())
+                {
+                    pendingUnicast.push_back(*it);
                 }
             }
-
-            if (localInterface == mCurrentInterfaces.end())
-                pendingUnicast.push_back(*it);
-
             ++it;
         }
 
